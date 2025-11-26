@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internet Archive IIIF Manifest Generator</title>
+    <style>
+        /* Basic Reset & Font */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Main container card */
+        .container {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* Input and Button Group */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        label {
+            font-weight: bold;
+            text-align: left;
+            margin-bottom: -5px;
+        }
+        
+        #ia-identifier {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        #ia-identifier:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+            outline: none;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Result Area */
+        #result-container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 8px;
+            text-align: left;
+            position: relative;
+        }
+        
+        /* Utility class to hide element */
+        .hidden {
+            display: none;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        pre {
+            background-color: #343a40;
+            color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;      /* ensures long URLs wrap */
+            word-break: break-all;      /* breaks the word to prevent overflow */
+        }
+        
+        #copy-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: #6c757d;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        #copy-btn:hover {
+            background-color: #5a6268;
+        }
+        
+        #copy-feedback {
+            position: absolute;
+            top: 20px;
+            right: 85px; /* next to copy button */
+            font-size: 12px;
+            color: #28a745;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>IIIF Manifest Generator</h1>
+        <p>Enter an Internet Archive identifier to generate its IIIF manifest URL.</p>
+
+        <div class="input-group">
+            <label for="ia-identifier">Internet Archive Identifier:</label>
+            <input type="text" id="ia-identifier" placeholder="e.g., msirvinproofsofp00irvi">
+            <button id="generate-btn">Generate URL</button>
+        </div>
+
+        <div id="result-container" class="hidden">
+            <h2>Generated Manifest URL:</h2>
+            <pre><code id="manifest-url"></code></pre>
+            <button id="copy-btn">Copy</button>
+            <span id="copy-feedback"></span>
+        </div>
+    </div>
+
+    <script>
+        // Wait for the DOM to be fully loaded before running the script
+        document.addEventListener('DOMContentLoaded', () => {
+            const identifierInput = document.getElementById('ia-identifier');
+            const generateBtn = document.getElementById('generate-btn');
+            const resultContainer = document.getElementById('result-container');
+            const manifestUrlElement = document.getElementById('manifest-url');
+            const copyBtn = document.getElementById('copy-btn');
+            const copyFeedback = document.getElementById('copy-feedback');
+
+            const generateManifestUrl = () => {
+                // 1. Get the value from the input and remove any extra whitespace
+                const identifier = identifierInput.value.trim();
+
+                // 2. Check if the identifier is not empty
+                if (identifier) {
+                    // 3. Construct the URL using a template literal
+                    const manifestUrl = `https://iiif.archive.org/iiif/${identifier}/manifest.json`;
+
+                    // 4. Display the URL in the result area
+                    manifestUrlElement.textContent = manifestUrl;
+                    
+                    // 5. Make the result container visible
+                    resultContainer.classList.remove('hidden');
+                    
+                    // 6. Clear any previous "Copied!" message
+                    copyFeedback.textContent = '';
+                } else {
+                    // If input is empty, hide the result container
+                    resultContainer.classList.add('hidden');
+                    alert('Please enter an Internet Archive identifier.');
+                }
+            };
+            
+            // Event listener for the "Generate" button
+            generateBtn.addEventListener('click', generateManifestUrl);
+            
+            // Event listener to allow pressing "Enter" in the input field
+            identifierInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    // Prevent the default form submission behavior (if any)
+                    event.preventDefault();
+                    // Trigger a click on the generate button
+                    generateBtn.click();
+                }
+            });
+
+            // Event listener for the "Copy" button
+            copyBtn.addEventListener('click', () => {
+                const urlToCopy = manifestUrlElement.textContent;
+                navigator.clipboard.writeText(urlToCopy).then(() => {
+                    // Success!
+                    copyFeedback.textContent = 'Copied!';
+                    // Make the message disappear after 2 seconds
+                    setTimeout(() => {
+                        copyFeedback.textContent = '';
+                    }, 2000);
+                }).catch(err => {
+                    // Error
+                    copyFeedback.textContent = 'Failed!';
+                    console.error('Failed to copy: ', err);
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
