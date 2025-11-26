@@ -95,42 +95,6 @@
             background-color: #004f70;
         }
 
-
-.examples-container {
-    text-align: center;
-    margin-top: 25px;
-    color: #666;
-}
-
-.examples-container p {
-    margin-bottom: 10px;
-    font-size: 14px;
-}
-
-.pills-wrapper {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-}
-
-.example-pill {
-    background-color: #e9ecef;
-    color: #007bff;
-    border: 1px solid #dee2e6;
-    padding: 6px 14px;
-    font-size: 14px;
-    font-weight: 500;
-    border-radius: 20px; /* This makes them pill-shaped */
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.example-pill:hover {
-    background-color: #dbe2e8;
-    border-color: #cdd5dc;
-}
-        
         /* Result Area */
         #result-container {
             margin-top: 30px;
@@ -196,15 +160,7 @@
             <input type="text" id="ia-identifier" placeholder="e.g., msirvinproofsofp00irvi">
             <button id="generate-btn">Generate URL</button>
         </div>
- 
-f<div class="examples-container">
-    <p>Or try an example:</p>
-    <div class="pills-wrapper">
-        <button class="example-pill" data-id="msirvinproofsofp00irvi">18th Century Book</button>
-        <button class="example-pill" data-id="goodytwoshoes00newyiala">Goody Two-Shoes</button>
-        <button class="example-pill" data-id="geologicalmapofc00unit">Geological Map</button>
-    </div>
-</div>
+
         <div id="result-container" class="hidden">
             <h2>Generated Manifest URL:</h2>
             <pre><code id="manifest-url"></code></pre>
@@ -222,21 +178,6 @@ f<div class="examples-container">
             const manifestUrlElement = document.getElementById('manifest-url');
             const copyBtn = document.getElementById('copy-btn');
             const copyFeedback = document.getElementById('copy-feedback');
-              const examplePills = document.querySelectorAll('.example-pill');
-
-// Loop over each pill and add a click event listener
-examplePills.forEach(pill => {
-    pill.addEventListener('click', () => {
-        // 1. Get the identifier from the data-id attribute
-        const exampleId = pill.dataset.id;
-        
-        // 2. Set the input field's value to this identifier
-        identifierInput.value = exampleId;
-        
-        // 3. Automatically trigger the URL generation
-        generateManifestUrl();
-    });
-});
 
             const generateManifestUrl = () => {
                 // 1. Get the value from the input and remove any extra whitespace
