@@ -153,13 +153,13 @@
 
     <div class="container">      
         <h1><img src="https://upload.wikimedia.org/wikipedia/commons/e/e8/International_Image_Interoperability_Framework_logo.png" alt="IIIF Logo" class="iiif-logo">IIIF Manifest Generator</h1>
-        <p>Enter an Internet Archive identifier to generate its IIIF manifest URL.</p>
+          <p>Paste an Internet Archive link (or just an identifier) to generate its IIIF manifest URL.</p>
 
-        <div class="input-group">
-            <label for="ia-identifier">Internet Archive Identifier:</label>
-            <input type="text" id="ia-identifier" placeholder="e.g., msirvinproofsofp00irvi">
-            <button id="generate-btn">Generate URL</button>
-        </div>
+    <div class="input-group">
+        <label for="ia-identifier">Internet Archive Link or Identifier:</label>
+        <input type="text" id="ia-identifier" placeholder="e.g., https://archive.org/details/msirvinproofsofp00irvi">
+        <button id="generate-btn">Generate URL</button>
+    </div>
 
         <div id="result-container" class="hidden">
             <h2>Generated Manifest URL:</h2>
@@ -169,71 +169,96 @@
         </div>
     </div>
 
-    <script>
-        // Wait for the DOM to be fully loaded before running the script
-        document.addEventListener('DOMContentLoaded', () => {
-            const identifierInput = document.getElementById('ia-identifier');
-            const generateBtn = document.getElementById('generate-btn');
-            const resultContainer = document.getElementById('result-container');
-            const manifestUrlElement = document.getElementById('manifest-url');
-            const copyBtn = document.getElementById('copy-btn');
-            const copyFeedback = document.getElementById('copy-feedback');
+   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const identifierInput = document.getElementById('ia-identifier');
+        const generateBtn = document.getElementById('generate-btn');
+        const resultContainer = document.getElementById('result-container');
+        const manifestUrlElement = document.getElementById('manifest-url');
+        const copyBtn = document.getElementById('copy-btn');
+        const copyFeedback = document.getElementById('copy-feedback');
 
-            const generateManifestUrl = () => {
-                // 1. Get the value from the input and remove any extra whitespace
-                const identifier = identifierInput.value.trim();
+        // Path prefixes on archive.org where the identifier is the next segment
+        const IA_PATH_PREFIXES = ['details', 'stream', 'download', 'embed', 'compress', 'metadata', 'services'];
 
-                // 2. Check if the identifier is not empty
-                if (identifier) {
-                    // 3. Construct the URL using a template literal
-                    const manifestUrl = `https://iiif.archive.org/iiif/${identifier}/manifest.json`;
+        /**
+         * Accepts either a full Internet Archive URL or a bare identifier
+         * and returns the identifier (or null if one can't be found).
+         */
+        const extractIdentifier = (input) => {
+            const value = input.trim();
+            if (!value) return null;
 
-                    // 4. Display the URL in the result area
-                    manifestUrlElement.textContent = manifestUrl;
-                    
-                    // 5. Make the result container visible
-                    resultContainer.classList.remove('hidden');
-                    
-                    // 6. Clear any previous "Copied!" message
-                    copyFeedback.textContent = '';
-                } else {
-                    // If input is empty, hide the result container
-                    resultContainer.classList.add('hidden');
-                    alert('Please enter an Internet Archive identifier.');
+            // Looks like a URL or contains a path? Try to parse it.
+            if (/^https?:\/\//i.test(value) || value.includes('/') || value.includes('archive.org')) {
+                let url;
+                try {
+                    url = new URL(/^https?:\/\//i.test(value) ? value : 'https://' + value);
+                } catch (e) {
+                    return null;
                 }
-            };
-            
-            // Event listener for the "Generate" button
-            generateBtn.addEventListener('click', generateManifestUrl);
-            
-            // Event listener to allow pressing "Enter" in the input field
-            identifierInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    // Prevent the default form submission behavior (if any)
-                    event.preventDefault();
-                    // Trigger a click on the generate button
-                    generateBtn.click();
-                }
-            });
 
-            // Event listener for the "Copy" button
-            copyBtn.addEventListener('click', () => {
-                const urlToCopy = manifestUrlElement.textContent;
-                navigator.clipboard.writeText(urlToCopy).then(() => {
-                    // Success!
-                    copyFeedback.textContent = 'Copied!';
-                    // Make the message disappear after 2 seconds
-                    setTimeout(() => {
-                        copyFeedback.textContent = '';
-                    }, 2000);
-                }).catch(err => {
-                    // Error
-                    copyFeedback.textContent = 'Failed!';
-                    console.error('Failed to copy: ', err);
-                });
+                const host = url.hostname.toLowerCase();
+                const isIA = host === 'archive.org' || host.endsWith('.archive.org');
+                if (!isIA) return null;
+
+                const segments = url.pathname.split('/').filter(Boolean);
+
+                // https://archive.org/details/ID/..., /stream/ID/..., /download/ID/..., etc.
+                if (IA_PATH_PREFIXES.includes(segments[0]) && segments[1]) {
+                    return decodeURIComponent(segments[1]);
+                }
+
+                // https://iiif.archive.org/iiif/ID/manifest.json
+                if (segments[0] === 'iiif' && segments[1]) {
+                    return decodeURIComponent(segments[1]);
+                }
+
+                return null;
+            }
+
+            // Otherwise, treat it as a bare identifier
+            return /^[A-Za-z0-9._-]+$/.test(value) ? value : null;
+        };
+
+        const generateManifestUrl = () => {
+            const rawInput = identifierInput.value;
+            const identifier = extractIdentifier(rawInput);
+
+            if (identifier) {
+                const manifestUrl = `https://iiif.archive.org/iiif/${identifier}/manifest.json`;
+                manifestUrlElement.textContent = manifestUrl;
+                resultContainer.classList.remove('hidden');
+                copyFeedback.textContent = '';
+            } else {
+                resultContainer.classList.add('hidden');
+                alert(rawInput.trim()
+                    ? 'Could not find an Internet Archive identifier in that input. Please paste a link like https://archive.org/details/your-identifier.'
+                    : 'Please enter an Internet Archive link or identifier.');
+            }
+        };
+
+        generateBtn.addEventListener('click', generateManifestUrl);
+
+        identifierInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                generateBtn.click();
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const urlToCopy = manifestUrlElement.textContent;
+            navigator.clipboard.writeText(urlToCopy).then(() => {
+                copyFeedback.textContent = 'Copied!';
+                setTimeout(() => { copyFeedback.textContent = ''; }, 2000);
+            }).catch(err => {
+                copyFeedback.textContent = 'Failed!';
+                console.error('Failed to copy: ', err);
             });
         });
-    </script>
+    });
+</script>
 
 </body>
 </html>
