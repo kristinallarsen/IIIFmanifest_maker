@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internet Archive IIIF Manifest Generator</title>
+    <title>IIIF Manifest Generator</title>
     <style>
         /* Import Open Sans from Google Fonts */
         @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
@@ -125,27 +125,52 @@
             word-break: break-all;      /* breaks the word to prevent overflow */
         }
         
-        #copy-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background-color: #6c757d;
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-        
-        #copy-btn:hover {
-            background-color: #5a6268;
-        }
-        
-        #copy-feedback {
-            position: absolute;
-            top: 20px;
-            right: 85px; /* next to copy button */
-            font-size: 12px;
-            color: #28a745;
-            font-weight: bold;
-        }
+      .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.result-header h2 {
+    margin: 0;
+}
+
+.result-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#copy-btn,
+#open-btn {
+    display: inline-block;
+    background-color: #6c757d;
+    color: #fff;
+    padding: 5px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: normal;
+    text-decoration: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#copy-btn:hover,
+#open-btn:hover {
+    background-color: #5a6268;
+}
+
+#copy-feedback {
+    font-size: 12px;
+    color: #28a745;
+    font-weight: bold;
+}  
 
     </style>
 </head>
@@ -153,23 +178,28 @@
 
     <div class="container">      
         <h1><img src="https://upload.wikimedia.org/wikipedia/commons/e/e8/International_Image_Interoperability_Framework_logo.png" alt="IIIF Logo" class="iiif-logo">IIIF Manifest Generator</h1>
-          <p>Paste an Internet Archive link (or just an identifier) to generate its IIIF manifest URL.</p>
+         <p>Paste an Internet Archive or CONTENTdm link to generate its IIIF manifest URL.</p>
 
-    <div class="input-group">
-        <label for="ia-identifier">Internet Archive Link or Identifier:</label>
-        <input type="text" id="ia-identifier" placeholder="e.g., https://archive.org/details/msirvinproofsofp00irvi">
-        <button id="generate-btn">Generate URL</button>
-    </div>
+<div class="input-group">
+    <label for="ia-identifier">Item Link:</label>
+    <input type="text" id="ia-identifier" placeholder="e.g., https://archive.org/details/msirvinproofsofp00irvi">
+    <button id="generate-btn">Generate URL</button>
+</div>
 
-        <div id="result-container" class="hidden">
-            <h2>Generated Manifest URL:</h2>
-            <pre><code id="manifest-url"></code></pre>
-            <button id="copy-btn">Copy</button>
+      <div id="result-container" class="hidden">
+    <div class="result-header">
+        <h2>Generated Manifest URL:</h2>
+        <div class="result-actions">
             <span id="copy-feedback"></span>
+            <a id="open-btn" href="#" target="_blank" rel="noopener noreferrer">Open</a>
+            <button id="copy-btn">Copy</button>
         </div>
     </div>
+    <pre><code id="manifest-url"></code></pre>
+</div>
+    </div>
 
-   <script>
+<script>
     document.addEventListener('DOMContentLoaded', () => {
         const identifierInput = document.getElementById('ia-identifier');
         const generateBtn = document.getElementById('generate-btn');
@@ -177,64 +207,82 @@
         const manifestUrlElement = document.getElementById('manifest-url');
         const copyBtn = document.getElementById('copy-btn');
         const copyFeedback = document.getElementById('copy-feedback');
+        const openBtn = document.getElementById('open-btn');
 
-        // Path prefixes on archive.org where the identifier is the next segment
         const IA_PATH_PREFIXES = ['details', 'stream', 'download', 'embed', 'compress', 'metadata', 'services'];
 
-        /**
-         * Accepts either a full Internet Archive URL or a bare identifier
-         * and returns the identifier (or null if one can't be found).
-         */
-        const extractIdentifier = (input) => {
+        // Each provider takes a parsed URL and returns a manifest URL, or null if it doesn't match
+        const providers = [
+            {
+                name: 'Internet Archive',
+                getManifest: (url) => {
+                    const host = url.hostname.toLowerCase();
+                    if (host !== 'archive.org' && !host.endsWith('.archive.org')) return null;
+
+                    const segments = url.pathname.split('/').filter(Boolean);
+                    if ((IA_PATH_PREFIXES.includes(segments[0]) || segments[0] === 'iiif') && segments[1]) {
+                        const id = decodeURIComponent(segments[1]);
+                        return `https://iiif.archive.org/iiif/${id}/manifest.json`;
+                    }
+                    return null;
+                }
+            },
+            {
+                name: 'CONTENTdm',
+                getManifest: (url) => {
+                    // Matches any CONTENTdm host, including custom institutional domains:
+                    //   /digital/collection/{alias}/id/{id}
+                    //   /cdm/ref/collection/{alias}/id/{id}  (legacy)
+                    const match = url.pathname.match(
+                        /\/(?:digital\/collection|cdm\/(?:ref|compoundobject|singleitem)\/collection)\/([^/]+)\/id\/(\d+)/i
+                    );
+                    if (!match) return null;
+                    const [, alias, id] = match;
+                    return `${url.origin}/iiif/info/${alias}/${id}/manifest.json`;
+                }
+            }
+        ];
+
+        const buildManifestUrl = (input) => {
             const value = input.trim();
             if (!value) return null;
 
-            // Looks like a URL or contains a path? Try to parse it.
-            if (/^https?:\/\//i.test(value) || value.includes('/') || value.includes('archive.org')) {
+            const looksLikeUrl = /^https?:\/\//i.test(value) || value.includes('/') || value.includes('.');
+
+            if (looksLikeUrl) {
                 let url;
                 try {
                     url = new URL(/^https?:\/\//i.test(value) ? value : 'https://' + value);
                 } catch (e) {
                     return null;
                 }
-
-                const host = url.hostname.toLowerCase();
-                const isIA = host === 'archive.org' || host.endsWith('.archive.org');
-                if (!isIA) return null;
-
-                const segments = url.pathname.split('/').filter(Boolean);
-
-                // https://archive.org/details/ID/..., /stream/ID/..., /download/ID/..., etc.
-                if (IA_PATH_PREFIXES.includes(segments[0]) && segments[1]) {
-                    return decodeURIComponent(segments[1]);
+                for (const provider of providers) {
+                    const manifest = provider.getManifest(url);
+                    if (manifest) return manifest;
                 }
-
-                // https://iiif.archive.org/iiif/ID/manifest.json
-                if (segments[0] === 'iiif' && segments[1]) {
-                    return decodeURIComponent(segments[1]);
-                }
-
                 return null;
             }
 
-            // Otherwise, treat it as a bare identifier
-            return /^[A-Za-z0-9._-]+$/.test(value) ? value : null;
+            // Bare identifier: assume Internet Archive
+            return /^[A-Za-z0-9._-]+$/.test(value)
+                ? `https://iiif.archive.org/iiif/${value}/manifest.json`
+                : null;
         };
 
         const generateManifestUrl = () => {
             const rawInput = identifierInput.value;
-            const identifier = extractIdentifier(rawInput);
+            const manifestUrl = buildManifestUrl(rawInput);
 
-            if (identifier) {
-                const manifestUrl = `https://iiif.archive.org/iiif/${identifier}/manifest.json`;
+           if (manifestUrl) {
                 manifestUrlElement.textContent = manifestUrl;
+                openBtn.href = manifestUrl;
                 resultContainer.classList.remove('hidden');
-                copyFeedback.textContent = '';
-            } else {
+    copyFeedback.textContent = '';
+        }  else {
                 resultContainer.classList.add('hidden');
                 alert(rawInput.trim()
-                    ? 'Could not find an Internet Archive identifier in that input. Please paste a link like https://archive.org/details/your-identifier.'
-                    : 'Please enter an Internet Archive link or identifier.');
+                    ? 'Could not generate a manifest from that input. Please paste an Internet Archive or CONTENTdm item link.'
+                    : 'Please enter a link.');
             }
         };
 
@@ -248,8 +296,7 @@
         });
 
         copyBtn.addEventListener('click', () => {
-            const urlToCopy = manifestUrlElement.textContent;
-            navigator.clipboard.writeText(urlToCopy).then(() => {
+            navigator.clipboard.writeText(manifestUrlElement.textContent).then(() => {
                 copyFeedback.textContent = 'Copied!';
                 setTimeout(() => { copyFeedback.textContent = ''; }, 2000);
             }).catch(err => {
